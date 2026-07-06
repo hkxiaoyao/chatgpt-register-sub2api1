@@ -9,7 +9,7 @@
 ## 功能特性
 
 - 支持 Outlook OAuth 邮箱池接收验证码
-- 支持 Gmail OAuth/IMAP 邮箱池接收验证码
+- 支持 Gmail OAuth/IMAP/应用密码 邮箱池接收验证码
 - 支持 Outlook `+数字` 别名扩展
 - 支持注册、workspace 加入/申请、refresh/check、导出完整流水线
 - 支持本地 WebUI 两种主流程
