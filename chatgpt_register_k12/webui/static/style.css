@@ -101,10 +101,31 @@ label {
   width: fit-content;
 }
 
+.compact-switch {
+  margin: 22px 0 0;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 .switch input,
 .check input {
   width: auto;
   margin: 0;
+}
+
+.alias-settings {
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.alias-settings label {
+  margin-bottom: 0;
+}
+
+.alias-custom-panel {
+  margin: 2px 0 12px;
 }
 
 .provider-switch {

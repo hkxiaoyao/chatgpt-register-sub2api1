@@ -714,6 +714,52 @@ class OfflineFlowTests(unittest.TestCase):
             "aliasuser+5@example.com",
         )
 
+    def test_alias_limit_is_capped_at_six(self):
+        candidates = configured_mailboxes(
+            {
+                "providers": [
+                    {
+                        "type": "gmail_password",
+                        "enable": True,
+                        "alias_enabled": True,
+                        "alias_limit_per_mailbox": 12,
+                        "mailboxes": "limituser@gmail.com----abcd efgh ijkl mnop",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(len(candidates), 6)
+        self.assertEqual(candidates[-1]["address"], "limituser+5@gmail.com")
+
+    def test_custom_alias_names_are_used_before_numeric_aliases(self):
+        candidates = configured_mailboxes(
+            {
+                "providers": [
+                    {
+                        "type": "gmail_password",
+                        "enable": True,
+                        "alias_enabled": True,
+                        "alias_limit_per_mailbox": 5,
+                        "alias_custom_name_enabled": True,
+                        "alias_custom_names": "alpha\nuser+beta@gmail.com\nalpha",
+                        "mailboxes": "user@gmail.com----abcd efgh ijkl mnop",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            [item["address"] for item in candidates],
+            [
+                "user@gmail.com",
+                "user+alpha@gmail.com",
+                "user+beta@gmail.com",
+                "user+1@gmail.com",
+                "user+2@gmail.com",
+            ],
+        )
+
     def test_outlook_alias_pool_uses_main_plus_five_aliases(self):
         with tempfile.TemporaryDirectory() as tmp:
             entry = {
@@ -855,6 +901,41 @@ class OfflineFlowTests(unittest.TestCase):
                 self.assertEqual(second["address"], "user+1@gmail.com")
                 self.assertEqual(second["login_address"], "user@gmail.com")
                 self.assertEqual(second["app_password"], "abcdefghijklmnop")
+            finally:
+                provider.close()
+
+    def test_gmail_password_pool_uses_custom_alias_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            entry = {
+                "type": "gmail_password",
+                "enable": True,
+                "alias_enabled": True,
+                "alias_limit_per_mailbox": 3,
+                "alias_custom_name_enabled": True,
+                "alias_custom_names": "team\nops",
+                "mailboxes": "user@gmail.com----abcd efgh ijkl mnop",
+            }
+            provider = GmailPasswordProvider(
+                entry,
+                _make_config(
+                    {
+                        "_config_dir": tmp,
+                        "request_timeout": 1,
+                        "wait_timeout": 1,
+                        "wait_interval": 1,
+                    }
+                ),
+            )
+            try:
+                first = provider.create_mailbox()
+                mark_mailbox_result(first, success=True)
+                second = provider.create_mailbox()
+                mark_mailbox_result(second, success=True)
+                third = provider.create_mailbox()
+
+                self.assertEqual(first["address"], "user@gmail.com")
+                self.assertEqual(second["address"], "user+team@gmail.com")
+                self.assertEqual(third["address"], "user+ops@gmail.com")
             finally:
                 provider.close()
 

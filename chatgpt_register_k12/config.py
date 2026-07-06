@@ -24,6 +24,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "mode": "auto",
                 "alias_enabled": True,
                 "alias_limit_per_mailbox": 5,
+                "alias_custom_name_enabled": False,
+                "alias_custom_names": "",
                 "mailboxes": "",
             },
             {
@@ -42,6 +44,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "message_limit": 10,
                 "alias_enabled": True,
                 "alias_limit_per_mailbox": 5,
+                "alias_custom_name_enabled": False,
+                "alias_custom_names": "",
                 "mailboxes": "",
             },
         ],
@@ -50,6 +54,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "wait_interval": 2,
         "alias_enabled": True,
         "alias_limit_per_mailbox": 5,
+        "alias_custom_name_enabled": False,
+        "alias_custom_names": "",
     },
     "proxy": {
         "url": "",

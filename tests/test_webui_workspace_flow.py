@@ -540,6 +540,53 @@ class WebUIServerTests(unittest.TestCase):
                 "user@gmail.com----abcd efgh ijkl mnop",
             )
 
+    def test_config_save_clamps_alias_limit_and_custom_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.yaml"
+
+            class Handler(WebUIHandler):
+                pass
+
+            Handler.base_dir = Path(tmp)
+            Handler.manager = JobManager(Path(tmp))
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                body = json.dumps(
+                    {
+                        "config_path": str(config_path),
+                        "mail_provider": "outlook",
+                        "alias_enabled": True,
+                        "alias_limit_per_mailbox": 20,
+                        "alias_custom_name_enabled": True,
+                        "alias_custom_names": "alpha\nbeta",
+                    }
+                ).encode("utf-8")
+                req = Request(
+                    f"http://127.0.0.1:{server.server_address[1]}/api/config/save",
+                    data=body,
+                    headers={"content-type": "application/json"},
+                    method="POST",
+                )
+                payload = json.loads(urlopen(req, timeout=5).read().decode("utf-8"))
+            finally:
+                server.shutdown()
+                server.server_close()
+
+            self.assertTrue(payload["ok"])
+            saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["mail"]["alias_limit_per_mailbox"], 6)
+            self.assertTrue(saved["mail"]["alias_custom_name_enabled"])
+            self.assertEqual(saved["mail"]["alias_custom_names"], "alpha\nbeta")
+            providers = saved["mail"]["providers"]
+            outlook = next(item for item in providers if item["type"] == "outlook_token")
+            gmail = next(item for item in providers if item["type"] == "gmail_password")
+            self.assertEqual(outlook["alias_limit_per_mailbox"], 6)
+            self.assertEqual(gmail["alias_limit_per_mailbox"], 6)
+            self.assertTrue(outlook["alias_custom_name_enabled"])
+            self.assertTrue(gmail["alias_custom_name_enabled"])
+
     def test_config_save_ignores_registration_password_from_request(self):
         with tempfile.TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "config.yaml"

@@ -36,9 +36,18 @@
           <div class="row">
             <label>数量 <input name="count" type="number" min="1" value="10"></label>
             <label>线程 <input name="threads" type="number" min="1" value="2"></label>
-            <label>别名上限 <input name="alias_limit_per_mailbox" type="number" min="1" value="5"></label>
+            <div class="alias-settings">
+              <label>别名上限 <input name="alias_limit_per_mailbox" type="number" min="1" max="6" value="5"></label>
+              <label class="switch compact-switch"><span>自定义别名名称</span><input name="alias_custom_name_enabled" type="checkbox"></label>
+            </div>
           </div>
           <label class="switch"><span>启用邮箱别名</span><input name="alias_enabled" type="checkbox" checked></label>
+          <section class="alias-custom-panel" data-alias-custom-panel hidden>
+            <label>自定义别名名称
+              <textarea name="alias_custom_names" rows="3" spellcheck="false" placeholder="alpha&#10;beta&#10;team01"></textarea>
+            </label>
+            <p class="hint">每行一个 tag，会生成 user+tag@example.com。主邮箱算 1 个名额，最多 6 个地址；没填够会用 +1、+2 补齐。</p>
+          </section>
 
           <fieldset class="provider-switch">
             <legend>邮箱类型</legend>
@@ -114,6 +123,6 @@
         <pre id="terminalOutput" class="terminal"></pre>
       </section>
     </main>
-    <script src="/static/app.js?v=20260706-project-password"></script>
+    <script src="/static/app.js?v=20260706-alias-names"></script>
   </body>
 </html>

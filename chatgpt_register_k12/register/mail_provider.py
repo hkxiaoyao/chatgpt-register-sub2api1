@@ -52,6 +52,7 @@ _mail_provider_state_lock = Lock()
 _outlook_token_state_lock = _mail_provider_state_lock
 OUTLOOK_IN_USE_STALE_SECONDS = 300  # 5 minute stale timeout
 OUTLOOK_UNAVAILABLE_STATES = {"used", "token_invalid"}
+MAX_ALIAS_LIMIT_PER_MAILBOX = 6
 
 
 def _split_email(address: str) -> tuple[str, str]:
@@ -78,11 +79,87 @@ def _plus_alias_address(base_address: str, alias_index: int) -> str:
     return f"{local}+{alias_index}@{domain}"
 
 
-def _plus_aliases(base_address: str, limit: int) -> list[tuple[int, str]]:
-    return [
-        (index, _plus_alias_address(base_address, index))
-        for index in range(max(1, int(limit)))
-    ]
+def _alias_limit(value: Any, default: int = 5) -> int:
+    return min(MAX_ALIAS_LIMIT_PER_MAILBOX, _positive_int(value, default))
+
+
+def _alias_name_items(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = re.split(r"[\r\n,，;；]+", str(value or ""))
+
+    items: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        item = str(raw_item or "").strip()
+        if not item:
+            continue
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(item)
+    return items
+
+
+def _custom_alias_address(base_address: str, alias_name: str) -> str | None:
+    local, domain = _split_email(_base_plus_address(base_address))
+    if not domain:
+        return None
+
+    text = str(alias_name or "").strip()
+    if not text:
+        return None
+
+    if "@" in text:
+        candidate = text.lower()
+        candidate_local, _ = _split_email(candidate)
+        if "+" in candidate_local and _base_plus_address(candidate) == f"{local}@{domain}":
+            return candidate
+        text = candidate_local
+
+    if "+" in text:
+        text = text.split("+", 1)[1]
+    text = text.strip().lstrip("+")
+    text = re.sub(r"[^A-Za-z0-9._-]+", "", text).strip("._-")
+    if not text:
+        return None
+    return f"{local}+{text.lower()}@{domain}"
+
+
+def _plus_aliases(
+    base_address: str,
+    limit: int,
+    alias_names: Any = None,
+) -> list[tuple[int, str]]:
+    safe_limit = _alias_limit(limit, 1)
+    aliases: list[tuple[int, str]] = [(0, _plus_alias_address(base_address, 0))]
+    used = {aliases[0][1].lower()}
+
+    for alias_name in _alias_name_items(alias_names):
+        if len(aliases) >= safe_limit:
+            break
+        alias_address = _custom_alias_address(base_address, alias_name)
+        if not alias_address:
+            continue
+        key = alias_address.lower()
+        if key in used:
+            continue
+        aliases.append((len(aliases), alias_address))
+        used.add(key)
+
+    numeric_index = 1
+    while len(aliases) < safe_limit:
+        alias_address = _plus_alias_address(base_address, numeric_index)
+        numeric_index += 1
+        key = alias_address.lower()
+        if key in used:
+            continue
+        aliases.append((len(aliases), alias_address))
+        used.add(key)
+
+    return aliases
 
 
 def _credential_state_key(address: str, provider: str) -> str:
@@ -413,9 +490,23 @@ def configured_mailboxes(mail_config: dict) -> list[dict[str, Any]]:
                 or 6,
                 6,
             )
+            alias_limit = _alias_limit(alias_limit, 6)
+            alias_names = (
+                entry.get("alias_custom_names")
+                or conf.get("alias_custom_names")
+                if _bool_value(
+                    entry.get("alias_custom_name_enabled"),
+                    _bool_value(conf.get("alias_custom_name_enabled"), False),
+                )
+                else None
+            )
             for credential in pool:
                 base_address = _base_plus_address(credential["email"])
-                aliases = _plus_aliases(base_address, alias_limit if alias_enabled else 1)
+                aliases = _plus_aliases(
+                    base_address,
+                    alias_limit if alias_enabled else 1,
+                    alias_names,
+                )
                 for alias_index, alias_address in aliases:
                     candidates.append(
                         {
@@ -458,11 +549,25 @@ def configured_mailboxes(mail_config: dict) -> list[dict[str, Any]]:
                 or 6,
                 6,
             )
+            alias_limit = _alias_limit(alias_limit, 6)
+            alias_names = (
+                entry.get("alias_custom_names")
+                or conf.get("alias_custom_names")
+                if _bool_value(
+                    entry.get("alias_custom_name_enabled"),
+                    _bool_value(conf.get("alias_custom_name_enabled"), False),
+                )
+                else None
+            )
             for credential in parse_gmail_password_credentials(
                 str(entry.get("mailboxes") or entry.get("pool") or "")
             ):
                 base_address = _base_plus_address(credential["email"])
-                aliases = _plus_aliases(base_address, alias_limit if alias_enabled else 1)
+                aliases = _plus_aliases(
+                    base_address,
+                    alias_limit if alias_enabled else 1,
+                    alias_names,
+                )
                 for alias_index, alias_address in aliases:
                     candidates.append(
                         {
@@ -893,6 +998,14 @@ class OutlookTokenProvider(BaseMailProvider):
             or 6,
             6,
         )
+        self.alias_limit_per_mailbox = _alias_limit(self.alias_limit_per_mailbox, 6)
+        self.alias_custom_name_enabled = _bool_value(
+            entry.get("alias_custom_name_enabled"),
+            _bool_value(conf.get("alias_custom_name_enabled"), False),
+        )
+        self.alias_custom_names = (
+            entry.get("alias_custom_names") or conf.get("alias_custom_names") or ""
+        )
         self.state_file = Path(conf.get("state_file") or STATE_FILE)
         self.workspace_id = str(conf.get("workspace_id") or "").strip()
         self.workspace_state_file = Path(
@@ -983,6 +1096,7 @@ class OutlookTokenProvider(BaseMailProvider):
                 aliases = _plus_aliases(
                     base_address,
                     self.alias_limit_per_mailbox if self.alias_enabled else 1,
+                    self.alias_custom_names if self.alias_custom_name_enabled else None,
                 )
                 for alias_index, alias_address in aliases:
                     if not _entry_available_for_workspace(
@@ -1457,6 +1571,14 @@ class GmailPasswordProvider(BaseMailProvider):
             or 6,
             6,
         )
+        self.alias_limit_per_mailbox = _alias_limit(self.alias_limit_per_mailbox, 6)
+        self.alias_custom_name_enabled = _bool_value(
+            entry.get("alias_custom_name_enabled"),
+            _bool_value(conf.get("alias_custom_name_enabled"), False),
+        )
+        self.alias_custom_names = (
+            entry.get("alias_custom_names") or conf.get("alias_custom_names") or ""
+        )
         self.state_file = Path(conf.get("state_file") or STATE_FILE)
         self.workspace_id = str(conf.get("workspace_id") or "").strip()
         self.workspace_state_file = Path(
@@ -1479,6 +1601,7 @@ class GmailPasswordProvider(BaseMailProvider):
                 aliases = _plus_aliases(
                     base_address,
                     self.alias_limit_per_mailbox if self.alias_enabled else 1,
+                    self.alias_custom_names if self.alias_custom_name_enabled else None,
                 )
                 for alias_index, alias_address in aliases:
                     if not _entry_available_for_workspace(
@@ -1588,10 +1711,15 @@ def _make_config(mail_config: dict) -> dict:
         "proxy": str(mail_config.get("proxy") or "").strip(),
         "state_file": str(state_file),
         "alias_enabled": _bool_value(mail_config.get("alias_enabled"), False),
-        "alias_limit_per_mailbox": _positive_int(
+        "alias_limit_per_mailbox": _alias_limit(
             mail_config.get("alias_limit_per_mailbox") or 5,
-            6,
+            5,
         ),
+        "alias_custom_name_enabled": _bool_value(
+            mail_config.get("alias_custom_name_enabled"),
+            False,
+        ),
+        "alias_custom_names": mail_config.get("alias_custom_names") or "",
     }
 
 

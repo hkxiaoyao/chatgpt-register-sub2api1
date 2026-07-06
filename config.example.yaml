@@ -10,6 +10,11 @@ mail:
       # true: main address + aliases, limited by alias_limit_per_mailbox
       alias_enabled: true
       alias_limit_per_mailbox: 5
+      # Optional custom plus-address tags. Main mailbox still counts as one slot.
+      alias_custom_name_enabled: false
+      alias_custom_names: |
+        alpha
+        beta
       mailboxes: |
         user1@example.com----password1----client_id_1----refresh_token_1
         user2@example.com----password2----client_id_2----refresh_token_2
@@ -27,6 +32,10 @@ mail:
       message_limit: 10
       alias_enabled: true
       alias_limit_per_mailbox: 5
+      alias_custom_name_enabled: false
+      alias_custom_names: |
+        alpha
+        beta
       mailboxes: |
         user1@example.com----gmail_app_password
   request_timeout: 30
@@ -34,6 +43,10 @@ mail:
   wait_interval: 3
   alias_enabled: true
   alias_limit_per_mailbox: 5
+  alias_custom_name_enabled: false
+  alias_custom_names: |
+    alpha
+    beta
 
 proxy:
   url: "socks5://127.0.0.1:1080"

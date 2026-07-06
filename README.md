@@ -142,6 +142,7 @@ user+1@example.com
 user+2@example.com
 user+3@example.com
 user+4@example.com
+user+5@example.com
 ```
 
 配置示例：
@@ -154,6 +155,10 @@ mail:
       mode: auto
       alias_enabled: true
       alias_limit_per_mailbox: 5
+      alias_custom_name_enabled: false
+      alias_custom_names: |
+        alpha
+        beta
       mailboxes: |
         user@example.com----mail_password----client_id----refresh_token
 
@@ -240,16 +245,22 @@ App Password 中间的空格可以保留，程序会自动去掉。使用 Gmail 
 ```yaml
 alias_enabled: true
 alias_limit_per_mailbox: 5
+alias_custom_name_enabled: false
+alias_custom_names: |
+  alpha
+  beta
 ```
 
 含义：
 
 - `alias_enabled`：是否启用 plus alias
-- `alias_limit_per_mailbox`：每个主邮箱最多使用多少个注册地址，包含主邮箱本身
+- `alias_limit_per_mailbox`：每个主邮箱最多使用多少个注册地址，包含主邮箱本身；程序会限制在 1 到 6
+- `alias_custom_name_enabled`：是否启用自定义 plus alias 名称
+- `alias_custom_names`：自定义 tag，一行一个；例如 `alpha` 会生成 `user+alpha@example.com`
 
 验证码仍从主邮箱读取；注册邮箱地址则按具体别名区分。Outlook Token 和 Gmail App Password 都支持 `user+1@example.com` 这类 plus alias。
 
-默认建议每个主邮箱使用 5 个地址（主邮箱 + `+1` 到 `+4`）。如果你明确要尝试第 6 个地址，可以把 `alias_limit_per_mailbox` 改成 `6`，但 Outlook/目标服务对第 6 个别名更容易出现验证码超时或后续 token 吊销。
+默认建议每个主邮箱使用 5 个地址（主邮箱 + `+1` 到 `+4`）。如果开启自定义名称，主邮箱仍然算第 1 个名额，自定义 tag 会优先使用；没填够时程序会继续用 `+1`、`+2` 补齐。硬上限是 6 个地址。
 
 ### Workspace
 

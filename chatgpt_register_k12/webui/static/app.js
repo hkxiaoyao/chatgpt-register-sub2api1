@@ -8,6 +8,9 @@ const cancelJobEl = document.querySelector("#cancelJob");
 const accountsFileEl = document.querySelector("#accountsFile");
 const outputFileEl = document.querySelector("#outputFile");
 const providerInputs = document.querySelectorAll('input[name="mail_provider"]');
+const aliasLimitInput = form.querySelector('input[name="alias_limit_per_mailbox"]');
+const aliasCustomToggle = form.querySelector('input[name="alias_custom_name_enabled"]');
+const aliasCustomPanel = document.querySelector("[data-alias-custom-panel]");
 
 let currentJobId = "";
 let logSeq = 0;
@@ -17,6 +20,7 @@ const openedFolderJobs = new Set();
 
 function formData() {
   const data = new FormData(form);
+  const aliasLimit = clampAliasLimit();
   const workspaceIds = String(data.get("workspace_ids") || "")
     .split(/\r?\n/)
     .map((item) => item.trim())
@@ -31,13 +35,28 @@ function formData() {
     count: Number(data.get("count") || 10),
     threads: Number(data.get("threads") || 2),
     alias_enabled: Boolean(data.get("alias_enabled")),
-    alias_limit_per_mailbox: Number(data.get("alias_limit_per_mailbox") || 5),
+    alias_limit_per_mailbox: aliasLimit,
+    alias_custom_name_enabled: Boolean(data.get("alias_custom_name_enabled")),
+    alias_custom_names: data.get("alias_custom_names") || "",
     outlook_mailboxes: data.get("outlook_mailboxes") || "",
     gmail_mailboxes: data.get("gmail_mailboxes") || "",
     accounts_file: accountsFileEl?.value || "",
     input_file: accountsFileEl?.value || "",
     output_file: outputFileEl?.value || ""
   };
+}
+
+function clampAliasLimit() {
+  if (!aliasLimitInput) return 5;
+  const value = Number(aliasLimitInput.value || 5);
+  const next = Math.min(6, Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 5));
+  aliasLimitInput.value = String(next);
+  return next;
+}
+
+function syncAliasCustomPanel() {
+  if (!aliasCustomPanel) return;
+  aliasCustomPanel.hidden = !aliasCustomToggle?.checked;
 }
 
 function syncProviderPanels() {
@@ -249,5 +268,10 @@ providerInputs.forEach((input) => {
   input.addEventListener("change", syncProviderPanels);
 });
 
+aliasLimitInput?.addEventListener("change", clampAliasLimit);
+aliasLimitInput?.addEventListener("blur", clampAliasLimit);
+aliasCustomToggle?.addEventListener("change", syncAliasCustomPanel);
+
 syncProviderPanels();
+syncAliasCustomPanel();
 refreshHealth();

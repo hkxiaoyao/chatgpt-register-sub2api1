@@ -166,7 +166,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 outlook_mailboxes = str(body.get("outlook_mailboxes") or "").strip()
                 gmail_mailboxes = str(body.get("gmail_mailboxes") or "").strip()
                 alias_enabled = bool(body.get("alias_enabled", False))
-                alias_limit = max(1, int(body.get("alias_limit_per_mailbox") or 5))
+                alias_limit = min(
+                    6,
+                    max(1, int(body.get("alias_limit_per_mailbox") or 5)),
+                )
+                alias_custom_name_enabled = bool(
+                    body.get("alias_custom_name_enabled", False)
+                )
+                alias_custom_names = str(body.get("alias_custom_names") or "").strip()
                 providers = config.setdefault("mail", {}).setdefault("providers", [])
                 outlook = next(
                     (
@@ -203,11 +210,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 outlook["mode"] = str(outlook.get("mode") or "auto")
                 outlook["alias_enabled"] = alias_enabled
                 outlook["alias_limit_per_mailbox"] = alias_limit
+                outlook["alias_custom_name_enabled"] = alias_custom_name_enabled
+                outlook["alias_custom_names"] = alias_custom_names
                 if outlook_mailboxes:
                     outlook["mailboxes"] = outlook_mailboxes
                 gmail_password["enable"] = mail_provider == "gmail"
                 gmail_password["alias_enabled"] = alias_enabled
                 gmail_password["alias_limit_per_mailbox"] = alias_limit
+                gmail_password["alias_custom_name_enabled"] = alias_custom_name_enabled
+                gmail_password["alias_custom_names"] = alias_custom_names
                 gmail_password["imap_host"] = str(
                     gmail_password.get("imap_host") or "imap.gmail.com"
                 )
@@ -222,6 +233,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         provider["enable"] = False
                 config["mail"]["alias_enabled"] = alias_enabled
                 config["mail"]["alias_limit_per_mailbox"] = alias_limit
+                config["mail"]["alias_custom_name_enabled"] = alias_custom_name_enabled
+                config["mail"]["alias_custom_names"] = alias_custom_names
                 config.setdefault("web", {})["host"] = str(body.get("host") or "127.0.0.1")
                 config.setdefault("web", {})["port"] = int(body.get("port") or 8787)
                 target.parent.mkdir(parents=True, exist_ok=True)
